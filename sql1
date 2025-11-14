@@ -1,0 +1,91 @@
+# Jaime Snyder - Student ID: 012423814
+# D411 Task 2 - Restore-SQL.ps1
+# Description:
+#   Checks for existing ClientDB database, recreates it, imports CSV data into Clients table,
+#   verifies records, and logs output to SqlResults.txt.
+
+# --- Import SQL Module ---
+Import-Module SqlServer -ErrorAction Stop
+Write-Host "SQL Server module loaded successfully."
+
+# --- Variables ---
+$Server     = ".\SQLEXPRESS"          # SQL instance name in lab
+$Database   = "ClientDB"
+$CsvPath    = Join-Path $PSScriptRoot "NewClientData.csv"
+$SqlLogPath = Join-Path $PSScriptRoot "SqlResults.txt"
+
+if (Test-Path $SqlLogPath) { Clear-Content -Path $SqlLogPath }
+
+# --- Drop existing DB if found ---
+Write-Host "Checking for existing database '$Database'..." -ForegroundColor Cyan
+try {
+    $CheckQuery = "IF DB_ID('$Database') IS NOT NULL SELECT 1 ELSE SELECT 0;"
+    $Exists = Invoke-Sqlcmd -ServerInstance $Server -Query $CheckQuery
+    if ($Exists.Column1 -eq 1) {
+        Write-Host "Database '$Database' exists. Dropping..." -ForegroundColor Yellow
+        Invoke-Sqlcmd -ServerInstance $Server -Query "ALTER DATABASE [$Database] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [$Database];"
+    }
+    Invoke-Sqlcmd -ServerInstance $Server -Query "CREATE DATABASE [$Database];"
+    Write-Host "Database '$Database' created successfully." -ForegroundColor Green
+}
+catch {
+    Write-Host "Error creating database: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+# --- Create Clients table ---
+try {
+    $CreateTableQuery = @"
+    USE [$Database];
+    CREATE TABLE Clients (
+        ClientID INT IDENTITY(1,1) PRIMARY KEY,
+        FirstName NVARCHAR(50),
+        LastName NVARCHAR(50),
+        Email NVARCHAR(100),
+        Phone NVARCHAR(50)
+    );
+"@
+    Invoke-Sqlcmd -ServerInstance $Server -Database $Database -Query $CreateTableQuery
+    Write-Host "Table 'Clients' created successfully." -ForegroundColor Green
+}
+catch {
+    Write-Host "Error creating table: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+# --- Insert CSV data ---
+if (Test-Path $CsvPath) {
+    Write-Host "Importing data from '$CsvPath'..." -ForegroundColor Cyan
+    try {
+        $Rows = Import-Csv -Path $CsvPath
+        foreach ($row in $Rows) {
+            $First = $row.FirstName.Replace("'", "''")
+            $Last  = $row.LastName.Replace("'", "''")
+            $Email = $row.Email.Replace("'", "''")
+            $Phone = $row.Phone.Replace("'", "''")
+
+            $InsertQuery = "
+                INSERT INTO Clients (FirstName, LastName, Email, Phone)
+                VALUES ('$First', '$Last', '$Email', '$Phone');"
+            Invoke-Sqlcmd -ServerInstance $Server -Database $Database -Query $InsertQuery
+            Add-Content -Path $SqlLogPath -Value "Inserted: $First $Last"
+        }
+        Write-Host "CSV data inserted successfully." -ForegroundColor Green
+    }
+    catch {
+        Write-Host "Error inserting data: $($_.Exception.Message)" -ForegroundColor Red
+    }
+} else {
+    Write-Host "CSV file not found: $CsvPath" -ForegroundColor Red
+}
+
+# --- Verify inserted records ---
+try {
+    Write-Host "Verifying data in table 'Clients'..." -ForegroundColor Cyan
+    Invoke-Sqlcmd -ServerInstance $Server -Database $Database -Query "SELECT * FROM Clients;" |
+        Out-File -FilePath $SqlLogPath -Append
+    Write-Host "Verification complete. Results saved to SqlResults.txt" -ForegroundColor Cyan
+}
+catch {
+    Write-Host "Error verifying data: $($_.Exception.Message)" -ForegroundColor Yellow
+}
+
+Write-Host "Restore-SQL.ps1 execution complete. Results logged to $SqlLogPath" -ForegroundColor Green
