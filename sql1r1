@@ -1,0 +1,11 @@
+PS C:\Users\LabAdmin\Desktop\Requirements2> .\restore-sql.ps1
+SQL Server module loaded successfully.
+Checking for existing database 'ClientDB'...
+Database 'ClientDB' created successfully.
+Table 'Clients' created successfully.
+Importing data from 'C:\Users\LabAdmin\Desktop\Requirements2\NewClientData.csv'...
+Error inserting data: You cannot call a method on a null-valued expression.
+Verifying data in table 'Clients'...
+Verification complete. Results saved to SqlResults.txt
+Restore-SQL.ps1 execution complete. Results logged to C:\Users\LabAdmin\Desktop\Requirements2\SqlResults.txt
+PS C:\Users\LabAdmin\Desktop\Requirements2>
