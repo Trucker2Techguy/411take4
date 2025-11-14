@@ -1,0 +1,87 @@
+# Jaime Snyder - Student ID: 012423814
+# D411 Task 2 - Restore-AD.ps1
+# Description:
+#   Creates or recreates a Finance OU, imports users from financePersonnel.csv,
+#   verifies creation, and logs results to ADResults.txt.
+
+# --- Load Active Directory Module ---
+Import-Module ActiveDirectory -ErrorAction Stop
+Write-Host "Active Directory module loaded successfully."
+
+# --- Variables ---
+$OUName   = "Finance"
+$OUPath   = "OU=$OUName,DC=consultingfirm,DC=local"
+$CSVPath  = Join-Path $PSScriptRoot "financePersonnel.csv"
+$OutputLog = Join-Path $PSScriptRoot "ADResults.txt"
+
+# --- Clear old log if it exists ---
+if (Test-Path $OutputLog) { Clear-Content -Path $OutputLog }
+
+# --- Check if OU exists and delete it if it does ---
+Write-Host "Checking for existing OU '$OUName'..." -ForegroundColor Cyan
+try {
+    $ExistingOU = Get-ADOrganizationalUnit -Filter "Name -eq '$OUName'" -ErrorAction SilentlyContinue
+    if ($ExistingOU) {
+        Write-Host "Existing OU '$OUName' found. Deleting..." -ForegroundColor Yellow
+        Remove-ADOrganizationalUnit -Identity $ExistingOU.DistinguishedName -Recursive -Confirm:$false
+        Write-Host "OU '$OUName' deleted successfully." -ForegroundColor Yellow
+    }
+    # Create new OU
+    New-ADOrganizationalUnit -Name $OUName
+    Write-Host "OU '$OUName' has been created." -ForegroundColor Green
+}
+catch {
+    Write-Host "Error managing OU: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+# --- Import and create users from CSV ---
+if (Test-Path $CSVPath) {
+    Write-Host "Importing users from '$CSVPath'..." -ForegroundColor Cyan
+    try {
+        $Users = Import-Csv -Path $CSVPath
+        foreach ($User in $Users) {
+            if ($User.samAccount -and $User.First_Name -and $User.Last_Name) {
+                try {
+                    New-ADUser `
+                        -Name "$($User.First_Name) $($User.Last_Name)" `
+                        -GivenName $User.First_Name `
+                        -Surname $User.Last_Name `
+                        -SamAccountName $User.samAccount `
+                        -UserPrincipalName "$($User.samAccount)@consultingfirm.local" `
+                        -Path $OUPath `
+                        -AccountPassword (ConvertTo-SecureString "P@ssword123" -AsPlainText -Force) `
+                        -Enabled $true `
+                        -City $User.City `
+                        -PostalCode $User.PostalCode `
+                        -OfficePhone $User.OfficePhone `
+                        -MobilePhone $User.MobilePhone
+
+                    Add-Content -Path $OutputLog -Value "Created user: $($User.samAccount)"
+                    Write-Host "Created user: $($User.samAccount)" -ForegroundColor Green
+                }
+                catch {
+                    Write-Host "Failed to create $($User.samAccount): $($_.Exception.Message)" -ForegroundColor Red
+                }
+            }
+        }
+    }
+    catch {
+        Write-Host "Error importing CSV: $($_.Exception.Message)" -ForegroundColor Red
+    }
+} else {
+    Write-Host "CSV file not found at $CSVPath" -ForegroundColor Red
+}
+
+# --- Verify AD User Creation ---
+try {
+    Write-Host "Verifying users in '$OUName' OU..." -ForegroundColor Cyan
+    Get-ADUser -Filter * -SearchBase $OUPath |
+        Select-Object Name, SamAccountName |
+        Out-File -FilePath $OutputLog -Append
+    Write-Host "AD verification complete. Results saved to ADResults.txt" -ForegroundColor Cyan
+}
+catch {
+    Write-Host "Error verifying users: $($_.Exception.Message)" -ForegroundColor Yellow
+}
+
+Write-Host "Restore-AD.ps1 execution complete. Results logged to $OutputLog" -ForegroundColor Green
