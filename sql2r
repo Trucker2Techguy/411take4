@@ -1,0 +1,40 @@
+ C:\Users\LabAdmin\Desktop\Requirements2> .\Restore-SQL.ps1
+SQL Server module loaded successfully.
+Checking for existing database 'ClientDB'...
+Invoke-Sqlcmd: C:\Users\LabAdmin\Desktop\Requirements2\Restore-SQL.ps1:26
+Line |
+  26 |      $dbExists = Invoke-Sqlcmd -ServerInstance $Server -Query "
+     |                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | A network-related or instance-specific error occurred while establishing a connection to SQL Server. The server was not found or was not accessible. Verify that
+     | the instance name is correct and that SQL Server is configured to allow remote connections. (provider: Named Pipes Provider, error: 40 - Could not open a
+     | connection to SQL Server)
+Error checking or creating database: Incorrect syntax was encountered while parsing ''.
+Creating table 'Clients'...
+Invoke-Sqlcmd: C:\Users\LabAdmin\Desktop\Requirements2\Restore-SQL.ps1:55
+Line |
+  55 |      Invoke-Sqlcmd -ServerInstance $Server -Database $Database -Query  …
+     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | A network-related or instance-specific error occurred while establishing a connection to SQL Server. The server was not found or was not accessible. Verify that
+     | the instance name is correct and that SQL Server is configured to allow remote connections. (provider: Named Pipes Provider, error: 40 - Could not open a
+     | connection to SQL Server)
+Error creating table: Incorrect syntax was encountered while parsing ''.
+Importing data from 'C:\Users\LabAdmin\Desktop\Requirements2\NewClientData.csv'...
+Invoke-Sqlcmd: C:\Users\LabAdmin\Desktop\Requirements2\Restore-SQL.ps1:69
+Line |
+  69 |          Invoke-Sqlcmd -ServerInstance $Server -Database $Database -Qu …
+     |          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | A network-related or instance-specific error occurred while establishing a connection to SQL Server. The server was not found or was not accessible. Verify that
+     | the instance name is correct and that SQL Server is configured to allow remote connections. (provider: Named Pipes Provider, error: 40 - Could not open a
+     | connection to SQL Server)
+Error inserting data: Incorrect syntax was encountered while parsing ''.
+Verifying data in table 'Clients'...
+Invoke-Sqlcmd: C:\Users\LabAdmin\Desktop\Requirements2\Restore-SQL.ps1:80
+Line |
+  80 |  …  $results = Invoke-Sqlcmd -ServerInstance $Server -Database $Database …
+     |                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | A network-related or instance-specific error occurred while establishing a connection to SQL Server. The server was not found or was not accessible. Verify that
+     | the instance name is correct and that SQL Server is configured to allow remote connections. (provider: Named Pipes Provider, error: 40 - Could not open a
+     | connection to SQL Server)
+Error verifying data: Incorrect syntax was encountered while parsing ''.
+Restore-SQL.ps1 execution complete. Results logged to C:\Users\LabAdmin\Desktop\Requirements2\SqlResults.txt
+PS C:\Users\LabAdmin\Desktop\Requirements2>
