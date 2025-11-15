@@ -1,0 +1,97 @@
+# Jaime Snyder - Student ID: 012423814
+# D411 Task 2 - Restore-SQL.ps1
+# This script restores a SQL Server database from CSV data and verifies results.
+
+try {
+    Import-Module SqlServer -ErrorAction Stop
+    Write-Host "SQL Server module loaded successfully." -ForegroundColor Green
+}
+catch {
+    Write-Host "Failed to load SQL Server module. Exiting script." -ForegroundColor Red
+    exit
+}
+
+# Variables
+$Server = "localhost"
+$Database = "ClientDB"
+$CsvPath = "$PSScriptRoot\NewClientData.csv"
+$ResultsPath = "$PSScriptRoot\SqlResults.txt"
+
+# Clear old log if exists
+if (Test-Path $ResultsPath) { Remove-Item $ResultsPath }
+
+# Step 1: Check for existing database
+Write-Host "Checking for existing database '$Database'..."
+try {
+    $dbExists = Invoke-Sqlcmd -ServerInstance $Server -Query "
+        IF DB_ID('$Database') IS NOT NULL SELECT 'Exists' AS DBStatus"
+    if ($dbExists) {
+        Write-Host "Database '$Database' already exists."
+    }
+    else {
+        Write-Host "Creating database '$Database'..."
+        Invoke-Sqlcmd -ServerInstance $Server -Query "CREATE DATABASE [$Database]"
+        Write-Host "Database '$Database' created successfully." -ForegroundColor Green
+    }
+}
+catch {
+    Write-Host "Error checking or creating database: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+# Step 2: Create table
+Write-Host "Creating table 'Clients'..."
+try {
+    $createTableQuery = @"
+    IF OBJECT_ID('Clients', 'U') IS NOT NULL DROP TABLE Clients;
+    CREATE TABLE Clients (
+        ID INT IDENTITY(1,1) PRIMARY KEY,
+        FirstName NVARCHAR(50),
+        LastName NVARCHAR(50),
+        Company NVARCHAR(100),
+        Email NVARCHAR(100),
+        Phone NVARCHAR(50)
+    );
+"@
+    Invoke-Sqlcmd -ServerInstance $Server -Database $Database -Query $createTableQuery
+    Write-Host "Table 'Clients' created successfully." -ForegroundColor Green
+}
+catch {
+    Write-Host "Error creating table: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+# Step 3: Import CSV data
+Write-Host "Importing data from '$CsvPath'..."
+try {
+    $csvData = Import-Csv -Path $CsvPath
+    foreach ($row in $csvData) {
+        $insertQuery = "INSERT INTO Clients (FirstName, LastName, Company, Email, Phone)
+                        VALUES ('$($row.FirstName)', '$($row.LastName)', '$($row.Company)', '$($row.Email)', '$($row.Phone)')"
+        Invoke-Sqlcmd -ServerInstance $Server -Database $Database -Query $insertQuery
+    }
+    Write-Host "Data imported successfully." -ForegroundColor Green
+}
+catch {
+    Write-Host "Error inserting data: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+# Step 4: Verify table contents
+Write-Host "Verifying data in table 'Clients'..."
+try {
+    $results = Invoke-Sqlcmd -ServerInstance $Server -Database $Database -Query "SELECT TOP 10 * FROM Clients"
+    
+    # ✅ Always write something to SqlResults.txt, even if $results is null
+    if ($results) {
+        $results | Out-File -FilePath $ResultsPath
+    }
+    else {
+        "Verification completed — no rows found in 'Clients' table (table exists but data insert failed)." |
+            Out-File -FilePath $ResultsPath
+    }
+
+    Write-Host "Verification complete. Results saved to SqlResults.txt" -ForegroundColor Green
+}
+catch {
+    Write-Host "Error verifying data: $($_.Exception.Message)" -ForegroundColor Red
+}
+
+Write-Host "Restore-SQL.ps1 execution complete. Results logged to $ResultsPath" -ForegroundColor Green
