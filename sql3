@@ -1,0 +1,93 @@
+# Jaime Snyder - Student ID: 012423814
+# D411 Task 2 - Restore-SQL.ps1
+# This script checks for an existing SQL database named ClientDB, creates it if needed,
+# creates a Clients table, imports CSV data, verifies insertion, and logs results.
+# Includes exception handling for all major actions.
+
+Write-Host "Loading SQL Server module..."
+try {
+    Import-Module SqlServer -ErrorAction Stop
+    Write-Host "SQL Server module loaded successfully."
+} catch {
+    Write-Host "SQL Server module not found. Please install or enable it before running this script."
+    exit
+}
+
+# --- Configuration Variables ---
+$Server   = "localhost"
+$Database = "ClientDB"
+$CsvPath  = "$PSScriptRoot\NewClientData.csv"
+$LogFile  = "$PSScriptRoot\SqlResults.txt"
+
+# --- Step 1: Check for existing database ---
+Write-Host "Checking for existing database '$Database'..."
+try {
+    $dbExists = Invoke-Sqlcmd -ServerInstance $Server -Query "
+        IF DB_ID('$Database') IS NOT NULL
+            SELECT 'EXISTS' AS Status
+        ELSE
+            SELECT 'NOT_FOUND' AS Status;"
+    if ($dbExists.Status -eq 'EXISTS') {
+        Write-Host "Database '$Database' already exists."
+    } else {
+        Write-Host "Database not found. Creating database '$Database'..."
+        Invoke-Sqlcmd -ServerInstance $Server -Query "CREATE DATABASE [$Database];"
+        Write-Host "Database '$Database' created successfully."
+    }
+} catch {
+    Write-Host "Error checking or creating database: $($_.Exception.Message)"
+}
+
+# --- Step 2: Create table 'Clients' ---
+Write-Host "Creating table 'Clients'..."
+try {
+    $createTableQuery = @"
+    IF OBJECT_ID('Clients', 'U') IS NULL
+    CREATE TABLE Clients (
+        ClientID INT IDENTITY(1,1) PRIMARY KEY,
+        FirstName NVARCHAR(50),
+        LastName NVARCHAR(50),
+        Email NVARCHAR(100),
+        Phone NVARCHAR(20),
+        Company NVARCHAR(100)
+    );
+"@
+    Invoke-Sqlcmd -ServerInstance $Server -Database $Database -Query $createTableQuery
+    Write-Host "Table 'Clients' created successfully."
+} catch {
+    Write-Host "Error creating table: $($_.Exception.Message)"
+}
+
+# --- Step 3: Import data from CSV ---
+Write-Host "Importing data from '$CsvPath'..."
+try {
+    $clients = Import-Csv -Path $CsvPath
+    foreach ($client in $clients) {
+        $query = "INSERT INTO Clients (FirstName, LastName, Email, Phone, Company)
+                  VALUES ('$($client.FirstName)', '$($client.LastName)', '$($client.Email)', '$($client.Phone)', '$($client.Company)');"
+        Invoke-Sqlcmd -ServerInstance $Server -Database $Database -Query $query
+    }
+    Write-Host "Data inserted successfully into table 'Clients'."
+} catch {
+    Write-Host "Error inserting data: $($_.Exception.Message)"
+}
+
+# --- Step 4: Verify data and create SqlResults.txt ---
+Write-Host "Verifying data in table 'Clients'..."
+try {
+    $results = Invoke-Sqlcmd -ServerInstance $Server -Database $Database -Query "SELECT TOP 10 * FROM Clients"
+    if ($results) {
+        $results | Out-File $LogFile
+        Write-Host "Verification complete. Results saved to SqlResults.txt"
+    }
+    else {
+        "Verification attempted - no data returned (no live SQL connection)." | Out-File $LogFile
+        Write-Host "Verification complete. No data found, placeholder written to SqlResults.txt"
+    }
+}
+catch {
+    "Verification failed - simulated environment or connection issue. Error: $($_.Exception.Message)" | Out-File $LogFile
+    Write-Host "Error verifying data: $($_.Exception.Message)"
+}
+
+Write-Host "Restore-SQL.ps1 execution complete. Results logged to $LogFile"
